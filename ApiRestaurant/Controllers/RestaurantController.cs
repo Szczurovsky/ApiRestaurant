@@ -1,5 +1,8 @@
 ﻿using ApiRestaurant.Entities;
+using ApiRestaurant.Models;
+using AutoMapper;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace ApiRestaurant.Controllers
 {
@@ -7,14 +10,39 @@ namespace ApiRestaurant.Controllers
     public class RestaurantController:ControllerBase
     {
         private readonly RestaurantDbContext _dbContext;
-        public RestaurantController(RestaurantDbContext dbContext)
+        private readonly IMapper _mapper;
+        public RestaurantController(RestaurantDbContext dbContext, IMapper mapper)
         {
             _dbContext = dbContext;
+            _mapper = mapper;
         }
-        public ActionResult<IEnumerable<Restaurant>> GetAll()
+        [HttpGet]
+        public ActionResult<IEnumerable<RestaurantDto>> GetAll()
         {
-            var restaurants = _dbContext.Restaurants.ToList();
-            return restaurants;
+            var restaurants = _dbContext.Restaurants.Include(r => r.Dishes).Include(r => r.Address).ToList();
+            var restaurantsDtos = _mapper.Map<List<RestaurantDto>>(restaurants);
+            return Ok(restaurantsDtos);
+        }
+
+        [HttpGet("{id}")]
+        public ActionResult<RestaurantDto> Get([FromRoute] int id)
+        {
+            var restaurant = _dbContext.Restaurants.Include(r => r.Dishes).Include(r => r.Address).FirstOrDefault(x => x.Id == id);
+            if(restaurant == null)
+            {
+                return NotFound();
+            }
+            var restaurantDto = _mapper.Map<RestaurantDto>(restaurant);
+            return Ok(restaurantDto);
+        }
+        [HttpPost]
+        public ActionResult CreateRestaurant([FromBody] CreateRestaurantDto dto)
+        {
+            var restaurant = _mapper.Map<Restaurant>(dto);
+            _dbContext.Restaurants.Add(restaurant);
+            _dbContext.SaveChanges();
+
+            return Created($"/api/restaurant/{restaurant.Id}", null);
         }
     }
 }
